@@ -18,7 +18,7 @@ backend = Aer.get_backend('aer_simulator')
 tqc = transpile(qc, backend)
 result = backend.run(tqc, shots=1).result()
 bitstring = list(result.get_counts().keys())[0]  # e.g., '101'
-print("Bitstring:", bitstring)
+print("Bitstring:", bitstring[::-1])
 
 # Step 4: Traverse the tree
 description = []

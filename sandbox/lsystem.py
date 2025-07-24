@@ -23,7 +23,7 @@ class QuantumLSystem:
         self.rules = rules
         self.angle_choices = angle_choices
         self.current = axiom
-        self.angle = 25  # default angle
+        self.angle = 45  # default angle
 
     def generate(self, iterations):
         for _ in range(iterations):

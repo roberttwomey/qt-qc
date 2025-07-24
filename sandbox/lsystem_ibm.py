@@ -1,22 +1,19 @@
-from qiskit_ibm_provider import IBMQ
-from qiskit import QuantumCircuit, transpile, assemble
+from qiskit import QuantumCircuit, transpile
+from qiskit.test.mock import FakeLima
 import turtle
 import time
 
-# Load IBMQ and get backend
-IBMQ.load_account()
-provider = IBMQ.get_provider(hub='ibm-q')  # adjust if you’re in a different hub
-backend = provider.get_backend('ibmq_lima')  # or any available backend
+# Use a fake backend for simulation
+backend = FakeLima()
 
-# Generate quantum bitstring using real backend
+# Generate quantum bitstring using fake backend
 def quantum_bitstring_real(num_qubits=3):
     qc = QuantumCircuit(num_qubits, num_qubits)
     qc.h(range(num_qubits))  # Put qubits in superposition
     qc.measure(range(num_qubits), range(num_qubits))
 
     transpiled = transpile(qc, backend)
-    qobj = assemble(transpiled, shots=1)
-    job = backend.run(qobj)
+    job = backend.run(transpiled, shots=1)
     result = job.result()
     counts = result.get_counts()
     bitstring = list(counts.keys())[0]

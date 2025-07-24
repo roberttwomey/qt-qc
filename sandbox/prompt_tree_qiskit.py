@@ -40,11 +40,12 @@ def run_quantum_prompt():
     tqc = transpile(qc, backend)
     result = backend.run(tqc, shots=1).result()
     bitstring = list(result.get_counts().keys())[0]  # e.g. '010110'
+    # print(bitstring)
 
     # Reverse bitstring for correct qubit order
     bitstring = bitstring[::-1]
     return interpret_multi_qubit_prompt(bitstring)
 
 # Run it
-print("Quantum-Coherent Prompt:")
+print("Quantum-Coherent Prompt")
 print(run_quantum_prompt())
