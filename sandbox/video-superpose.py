@@ -44,10 +44,13 @@ while True:
     
     # === Play through blended superposition ===
     last_blended = None
-    for i in range(frame_count):
+    for i in range(frame_count*2):
         frames = []
-        for cap in caps.values():
+        for k, cap in caps.items():
             ret, frame = cap.read()
+            if not ret:
+                cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                ret, frame = cap.read()
             if ret:
                 frame = frame.astype(np.float32)
                 frames.append(frame)
@@ -71,44 +74,33 @@ while True:
                 cv2.destroyAllWindows()
                 exit()
     
-    # === Lerp transition from last superposition to first collapsed frames (dynamic) ===
+    # === Lerp transition from superposition to collapsed frames (dynamic) ===
     transition_frames = 30
-    if last_blended is not None:
-        last_blended_f = last_blended.astype(np.float32)
-        for i in range(transition_frames):
-            ret, collapsed_frame = collapsed_cap.read()
+    for i in range(transition_frames):
+        # Read next blended superposition frame
+        frames = []
+        for k, cap in caps.items():
+            ret, frame = cap.read()
             if not ret:
-                break
-            collapsed_f = collapsed_frame.astype(np.float32)
-            alpha = (i + 1) / transition_frames
-            frame = (1 - alpha) * last_blended_f + alpha * collapsed_f
-            frame = np.clip(frame, 0, 255).astype(np.uint8)
-            cv2.imshow("Quantum Video", frame)
-            key = cv2.waitKey(int(1000 / fps)) & 0xFF
-            if key == 27:
-                for cap in caps.values():
-                    cap.release()
-                collapsed_cap.release()
-                cv2.destroyAllWindows()
-                exit()
-    
-    # === Show only collapsed video ===
-    collapse_text_frames = int(fps)
-    collapse_frame_idx = 0
-    collapsed_frames_list = []  # Store collapsed frames for transition back
-    while True:
-        ret, frame = collapsed_cap.read()
+                cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                ret, frame = cap.read()
+            if ret:
+                frame = frame.astype(np.float32)
+                frames.append(frame)
+        # Read next collapsed frame
+        ret, collapsed_frame = collapsed_cap.read()
         if not ret:
+            collapsed_cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+            ret, collapsed_frame = collapsed_cap.read()
+        if not ret or len(frames) != 4:
             break
-        # Store for transition back
-        collapsed_frames_list.append(frame.copy())
-        # Display 'collapse' text for the first second
-        if collapse_frame_idx < collapse_text_frames:
-            cv2.putText(
-                frame, 'collapse', (30, 60),
-                cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0), 4, cv2.LINE_AA
-            )
-        collapse_frame_idx += 1
+        blended = sum(frames) / 4.0
+        blended = np.clip(blended, 0, 255).astype(np.uint8)
+        blended_f = blended.astype(np.float32)
+        collapsed_f = collapsed_frame.astype(np.float32)
+        alpha = (i + 1) / transition_frames
+        frame = (1 - alpha) * blended_f + alpha * collapsed_f
+        frame = np.clip(frame, 0, 255).astype(np.uint8)
         cv2.imshow("Quantum Video", frame)
         key = cv2.waitKey(int(1000 / fps)) & 0xFF
         if key == 27:
@@ -117,39 +109,67 @@ while True:
             collapsed_cap.release()
             cv2.destroyAllWindows()
             exit()
-    collapsed_cap.release()
 
-    # === Lerp transition from collapse back to superposition (dynamic) ===
-    # Rewind all input video captures to the start
-    for cap in caps.values():
-        cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-    # Rewind collapsed video to the start (for dynamic frames)
-    collapsed_cap = cv2.VideoCapture(video_paths[outcome])
+    # Do not release collapsed_cap; continue to play through it at current location
+    for i in range(frame_count*2):
+        ret, frame = collapsed_cap.read()
+        if not ret:
+            collapsed_cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+            ret, frame = collapsed_cap.read()
+        if not ret:
+            break
+        # Display 'collapsed' text for the first second
+        if i < int(fps):
+            cv2.putText(
+                frame, 'collapsed', (30, 60),
+                cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 255), 4, cv2.LINE_AA
+            )
+        cv2.imshow("Quantum Video", frame)
+        key = cv2.waitKey(int(1000 / fps)) & 0xFF
+        if key == 27:
+            for cap in caps.values():
+                cap.release()
+            collapsed_cap.release()
+            cv2.destroyAllWindows()
+            exit()
+    
+    # === Lerp transition from collapsed back to superposition (dynamic) ===
+    # Reset all video captures to the first frame for superposition
+    # for cap in caps.values():
+    #     cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+    # collapsed_cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+
     transition_frames = 30
     for i in range(transition_frames):
         # Read next collapsed frame
-        ret_c, collapsed_frame = collapsed_cap.read()
+        ret, collapsed_frame = collapsed_cap.read()
+        if not ret:
+            collapsed_cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+            ret, collapsed_frame = collapsed_cap.read()
+        if not ret:
+            break
+        collapsed_f = collapsed_frame.astype(np.float32)
+
         # Read next blended superposition frame
         frames = []
-        for cap in caps.values():
-            ret, frame = cap.read()
-            if ret:
+        for k, cap in caps.items():
+            ret2, frame = cap.read()
+            if not ret2:
+                cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                ret2, frame = cap.read()
+            if ret2:
                 frame = frame.astype(np.float32)
                 frames.append(frame)
-        if not ret_c or len(frames) != 4:
+        if len(frames) != 4:
             break
         blended = sum(frames) / 4.0
         blended = np.clip(blended, 0, 255).astype(np.uint8)
-        collapsed_f = collapsed_frame.astype(np.float32)
+        blended_f = blended.astype(np.float32)
+
+        # Lerp from collapsed to blended (reverse direction)
         alpha = (i + 1) / transition_frames
-        frame = (1 - alpha) * collapsed_f + alpha * blended.astype(np.float32)
+        frame = (1 - alpha) * collapsed_f + alpha * blended_f
         frame = np.clip(frame, 0, 255).astype(np.uint8)
-        # Optionally, display 'superposition' text for the last few frames
-        if i >= transition_frames - int(fps):
-            cv2.putText(
-                frame, 'superposition', (30, 60),
-                cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0), 4, cv2.LINE_AA
-            )
         cv2.imshow("Quantum Video", frame)
         key = cv2.waitKey(int(1000 / fps)) & 0xFF
         if key == 27:
