@@ -1,5 +1,6 @@
-qiskit==2.1.1
-qiskit-ibm-provider
+opencv-python
+numpy
+qiskit
 qiskit-aer
 matplotlib
-# turtle is included with standard Python, but listed for clarity 
+pillow 
