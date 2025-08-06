@@ -4,18 +4,6 @@ from qiskit import QuantumCircuit
 from qiskit_aer import Aer
 
 
-# === Qiskit: Generate Quantum Collapse ===
-qc = QuantumCircuit(2, 2)
-qc.h([0, 1])             # Superposition
-qc.measure([0, 1], [0, 1])
-
-backend = Aer.get_backend('qasm_simulator')
-job = backend.run(qc, shots=1)  # 1 shot to simulate single collapse
-result = job.result()
-counts = result.get_counts()
-outcome = list(result.get_counts().keys())[0]  # e.g. '10'
-print(f"Measured: {outcome}")
-
 # === File Paths for Videos ===
 video_paths = {
     "00": "video-00.mov",
@@ -35,8 +23,23 @@ height = int(caps["00"].get(cv2.CAP_PROP_FRAME_HEIGHT))
 cv2.namedWindow("Quantum Video", cv2.WINDOW_NORMAL)
 cv2.resizeWindow("Quantum Video", width, height)
 
+
+transition_frames = 30
+play_frames = 120
+
 # === Loop the sequence until user presses Escape ===
 while True:
+    # === Qiskit: Generate Quantum Collapse (each loop) ===
+    qc = QuantumCircuit(2, 2)
+    qc.h([0, 1])             # Superposition
+    qc.measure([0, 1], [0, 1])
+    backend = Aer.get_backend('qasm_simulator')
+    job = backend.run(qc, shots=1)  # 1 shot to simulate single collapse
+    result = job.result()
+    counts = result.get_counts()
+    outcome = list(result.get_counts().keys())[0]  # e.g. '10'
+    print(f"Measured: {outcome}")
+
     # Reset all video captures to the first frame
     for cap in caps.values():
         cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
@@ -44,7 +47,7 @@ while True:
     
     # === Play through blended superposition ===
     last_blended = None
-    for i in range(frame_count*2):
+    for i in range(play_frames):
         frames = []
         for k, cap in caps.items():
             ret, frame = cap.read()
@@ -60,11 +63,11 @@ while True:
             blended = np.clip(blended, 0, 255).astype(np.uint8)
             last_blended = blended.copy()
             # Display 'superposition' text for the first second
-            if i < int(fps):
-                cv2.putText(
-                    blended, 'superposition', (30, 60),
-                    cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0), 4, cv2.LINE_AA
-                )
+            # if i < int(fps):
+            cv2.putText(
+                blended, 'superposition', (30, 60),
+                cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0), 4, cv2.LINE_AA
+            )
             cv2.imshow("Quantum Video", blended)
             key = cv2.waitKey(int(1000 / fps)) & 0xFF
             if key == 27:  # Escape key
@@ -74,8 +77,7 @@ while True:
                 cv2.destroyAllWindows()
                 exit()
     
-    # === Lerp transition from superposition to collapsed frames (dynamic) ===
-    transition_frames = 30
+    # === Lerp transition from superposition to collapsed frames (dynamic) ===transition_frames = 30
     for i in range(transition_frames):
         # Read next blended superposition frame
         frames = []
@@ -101,6 +103,11 @@ while True:
         alpha = (i + 1) / transition_frames
         frame = (1 - alpha) * blended_f + alpha * collapsed_f
         frame = np.clip(frame, 0, 255).astype(np.uint8)
+        # Display measured outcome text during transition
+        cv2.putText(
+            frame, f'measured {outcome}', (30, 120),
+            cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0), 4, cv2.LINE_AA
+        )
         cv2.imshow("Quantum Video", frame)
         key = cv2.waitKey(int(1000 / fps)) & 0xFF
         if key == 27:
@@ -111,7 +118,7 @@ while True:
             exit()
 
     # Do not release collapsed_cap; continue to play through it at current location
-    for i in range(frame_count*2):
+    for i in range(play_frames):
         ret, frame = collapsed_cap.read()
         if not ret:
             collapsed_cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
