@@ -32,9 +32,10 @@ def sample_zoom_video():
     while True:
         zoom_raw, video = sample_once(qc)
         if zoom_raw < 12:
-            return {"zoom": zoom_raw, "video": video}
-        # else: reject values 12..15 and resample
-
+            return {
+                "zoom":  {"value": zoom_raw},
+                "video": {"value": video}
+            }
 if __name__ == "__main__":
     selection = sample_zoom_video()
     print(json.dumps(selection))
